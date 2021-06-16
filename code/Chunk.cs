@@ -11,7 +11,6 @@ namespace Sandblox
 		private readonly Map map;
 		private readonly Model model;
 		private readonly Mesh mesh;
-		private readonly VertexBufferHandle<BlockVertex> vb;
 		private readonly IntVector3 offset;
 		private SceneObject sceneObject;
 
@@ -20,11 +19,9 @@ namespace Sandblox
 			this.map = map;
 			this.offset = offset;
 
-			vb = new VertexBufferHandle<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
-
 			var material = Material.Load( "materials/voxel/voxel.vmat" );
 			mesh = Mesh.Create( material );
-			mesh.SetVertexBuffer( vb );
+			mesh.CreateVertexBuffer<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
 
 			var boundsMin = Vector3.Zero;
 			var boundsMax = boundsMin + (new Vector3( ChunkSize ) * 32);
@@ -40,9 +37,9 @@ namespace Sandblox
 
 		public void Delete()
 		{
-			if ( vb.IsValid )
+			if ( mesh.IsValid )
 			{
-				vb.Delete();
+				mesh.DeleteBuffers();
 			}
 
 			if ( sceneObject != null )
@@ -54,9 +51,9 @@ namespace Sandblox
 
 		public void Rebuild()
 		{
-			if ( vb.IsValid && mesh.IsValid )
+			if ( mesh.IsValid )
 			{
-				vb.Lock( Rebuild );
+				mesh.LockVertexBuffer<BlockVertex>( Rebuild );
 			}
 		}
 

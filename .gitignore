@@ -8,4 +8,4 @@ tools_thumbnail_cache.bin
 *.xml
 *.dll
 *.pdb
-.intermediate/net5.0/sandbox.deps.json
+.intermediate/net5.0/sandblox.deps.json
