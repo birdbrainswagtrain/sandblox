@@ -14,7 +14,6 @@ namespace Sandblox
         {
             Position = new Vector3( x, y, z );
 			Normal = normal;
-
             Color = Color.White;
         }
 

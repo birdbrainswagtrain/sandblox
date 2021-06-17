@@ -6,7 +6,6 @@ namespace Sandblox
 	public class Map
 	{
 		private readonly byte[] blockdata = null;
-		private readonly byte[] healthdata = null;
 
 		private readonly static int[] xOffsets = new[] { 0, 0, -1, 0, 1, 0 };
 		private readonly static int[] yOffsets = new[] { 0, 0, 0, 1, 0, -1 };
@@ -27,7 +26,6 @@ namespace Sandblox
 			this.sizeZ = sizeZ;
 
 			blockdata = new byte[this.sizeX * this.sizeY * this.sizeZ];
-			healthdata = new byte[this.sizeX * this.sizeY * this.sizeZ];
 		}
 
 		public void GeneratePerlin()
@@ -44,7 +42,6 @@ namespace Sandblox
 					{
 						int blockIndex = GetBlockIndex( x, y, z );
 						blockdata[blockIndex] = (byte)(z < height ? (Rand.Int( 2, 2 )) : 0);
-						healthdata[blockIndex] = (byte)Rand.Int( 1, 15 );
 					}
 				}
 			}
@@ -64,7 +61,6 @@ namespace Sandblox
 					{
 						int blockIndex = GetBlockIndex( x, y, z );
 						blockdata[blockIndex] = (byte)(z < height ? (Rand.Int( 1, 5 )) : 0);
-						healthdata[blockIndex] = (byte)Rand.Int( 1, 255 );
 					}
 				}
 			}
@@ -82,7 +78,6 @@ namespace Sandblox
 			if ( (blocktype != 0 && curBlocktype == 0) || (blocktype == 0 && curBlocktype != 0) )
 			{
 				blockdata[blockindex] = blocktype;
-				healthdata[blockindex] = health;
 
 				return true;
 			}
@@ -138,11 +133,6 @@ namespace Sandblox
 		public byte GetBlockData( int index )
 		{
 			return blockdata[index];
-		}
-
-		public byte GetBlockBrightness( int index )
-		{
-			return healthdata[index];
 		}
 
 		public enum BlockFace : int
