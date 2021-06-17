@@ -6,8 +6,10 @@ namespace Sandblox
 	{
 		public override void Respawn()
 		{
+			SetModel( "models/citizen/citizen.vmdl" );
+
 			Controller = new NoclipController();
-			Camera = new FirstPersonCamera();
+			Camera = new ThirdPersonCamera();
 
 			EnableAllCollisions = true;
 			EnableDrawing = true;

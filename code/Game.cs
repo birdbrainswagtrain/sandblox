@@ -1,5 +1,7 @@
 ﻿using Sandbox;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System;
 
 namespace Sandblox
 {
@@ -16,8 +18,58 @@ namespace Sandblox
 				_ = new HudEntity();
 			}
 
-			map = new Map( 512, 512, 128 );
-			map.GeneratePerlin();
+			var sw = Stopwatch.StartNew();
+			var loaded = Import.VBSP.Load( "gm_construct_9.bsp", Chunk.BlockScale );
+
+			int max_x = Int32.MinValue;
+			int max_y = Int32.MinValue;
+			int max_z = Int32.MinValue;
+
+			int min_x = Int32.MaxValue;
+			int min_y = Int32.MaxValue;
+			int min_z = Int32.MaxValue;
+
+			foreach (var pair in loaded.Chunks)
+			{
+				var pos = pair.Key;
+
+				max_x = Math.Max( max_x, (pos.Item1+1) * 32 );
+				max_y = Math.Max( max_y, (pos.Item2+1) * 32 );
+				max_z = Math.Max( max_z, (pos.Item3+1) * 32 );
+
+				min_x = Math.Min( min_x, pos.Item1 * 32 );
+				min_y = Math.Min( min_y, pos.Item2 * 32 );
+				min_z = Math.Min( min_z, pos.Item3 * 32 );
+			}
+			Log.Warning( $". {min_x} {min_y} {min_z}" );
+			Log.Warning( $"--> {sw.Elapsed.TotalMilliseconds}" );
+
+			map = new Map( max_x - min_x, max_y - min_y, max_z - min_z );
+
+			foreach ( var pair in loaded.Chunks )
+			{
+				var pos = pair.Key;
+				int offset_x = pos.Item1 * 32 - min_x;
+				int offset_y = pos.Item2 * 32 - min_y;
+				int offset_z = pos.Item3 * 32 - min_z;
+
+				var chunk = pair.Value;
+
+				for ( int z=0;z<32;z++)
+				{
+					for (int y=0;y<32;y++)
+					{
+						for (int x=0;x<32;x++)
+						{
+							var d = chunk.Get( x, y, z );
+							if (d != 0)
+							{
+								map.SetBlock( offset_x + x, offset_y + y, offset_z + z, d );
+							}
+						}
+					}
+				}
+			}
 
 			if ( IsClient )
 			{

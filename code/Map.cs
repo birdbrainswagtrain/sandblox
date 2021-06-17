@@ -66,7 +66,7 @@ namespace Sandblox
 			}
 		}
 
-		public bool SetBlock( int x, int y, int z, byte blocktype, byte health = 15 )
+		public bool SetBlock( int x, int y, int z, ushort blocktype)
 		{
 			if ( x < 0 || x >= sizeX ) return false;
 			if ( y < 0 || y >= sizeY ) return false;
@@ -77,7 +77,7 @@ namespace Sandblox
 
 			if ( (blocktype != 0 && curBlocktype == 0) || (blocktype == 0 && curBlocktype != 0) )
 			{
-				blockdata[blockindex] = blocktype;
+				blockdata[blockindex] = (byte)blocktype;
 
 				return true;
 			}
