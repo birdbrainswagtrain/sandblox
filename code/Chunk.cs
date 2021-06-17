@@ -8,6 +8,8 @@ namespace Sandblox
 		public static readonly int ChunkSize = 32;
 		private static readonly int MaxFaceCount = 7000;
 
+		public const float BlockScale = 32;
+
 		private readonly Map map;
 		private readonly Model model;
 		private readonly Mesh mesh;
@@ -19,19 +21,20 @@ namespace Sandblox
 			this.map = map;
 			this.offset = offset;
 
-			var material = Material.Load( "materials/voxel/voxel.vmat" );
+			var material = Material.Load( "materials/default/vertex_color.vmat" );
 			mesh = Mesh.Create( material );
 			mesh.CreateVertexBuffer<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
 
 			var boundsMin = Vector3.Zero;
-			var boundsMax = boundsMin + (new Vector3( ChunkSize ) * 32);
+			var boundsMax = boundsMin + (new Vector3( ChunkSize ) * BlockScale);
 			mesh.SetBounds( boundsMin, boundsMax );
 
 			Rebuild();
 
 			model = Model.Create( mesh );
 
-			var transform = new Transform( new Vector3( offset.x, offset.y, offset.z ) * 32.0f );
+			var rot = Rotation.Identity;
+			var transform = new Transform( new Vector3( offset.x, offset.y, offset.z ) * BlockScale, rot, BlockScale );
 			sceneObject = new SceneObject( model, transform );
 		}
 
@@ -76,9 +79,6 @@ namespace Sandblox
 
 						if ( blockType != 0 )
 						{
-							var brightness = (int)map.GetBlockBrightness( blockIndex );
-							brightness = (brightness & 15) << 23;
-
 							for ( int face = 0; face < 6; ++face )
 							{
 								if ( !map.IsAdjacentBlockEmpty( mx, my, mz, face ) )
@@ -87,7 +87,7 @@ namespace Sandblox
 								if ( vertexOffset + 6 >= vertices.Length )
 									break;
 
-								AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, face, blockType, brightness );
+								AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, face, blockType );
 								vertexOffset += 6;
 							}
 						}
@@ -120,17 +120,26 @@ namespace Sandblox
 			4, 7, 3, 3, 0, 4,
 		};
 
-		private static void AddQuad( Span<BlockVertex> vertices, int x, int y, int z, int face, byte blockType, int brightness )
+		private static void AddQuad( Span<BlockVertex> vertices, int x, int y, int z, int face, byte blockType )
 		{
-			byte textureId = (byte)(blockType - 1);
-			byte normal = (byte)face;
-			uint faceData = (uint)((textureId & 31) << 18 | brightness | (normal & 7) << 27);
+			Vector3 normal = Vector3.Zero;
+			switch ( face )
+			{
+				case 0: normal = new Vector3( 0, 0, 1 ); break;  // Z+
+				case 1: normal = new Vector3( 0, 0, -1 ); break; // Z-
+
+				case 2: normal = new Vector3( -1, 0, 0 ); break; // X-
+				case 3: normal = new Vector3( 0, 1, 0 ); break;  // Y+
+
+				case 4: normal = new Vector3( 1, 0, 0 ); break; // X+
+				case 5: normal = new Vector3( 0, -1, 0 ); break;  // Y-
+			}
 
 			for ( int i = 0; i < 6; ++i )
 			{
 				int vi = BlockIndices[(face * 6) + i];
 				var vOffset = BlockVertices[vi];
-				vertices[i] = new BlockVertex( (uint)(x + vOffset.x), (uint)(y + vOffset.y), (uint)(z + vOffset.z), faceData );
+				vertices[i] = new BlockVertex( (uint)(x + vOffset.x), (uint)(y + vOffset.y), (uint)(z + vOffset.z), normal, blockType );
 			}
 		}
 	}

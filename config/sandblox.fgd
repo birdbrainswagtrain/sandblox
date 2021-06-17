@@ -1,0 +1,8 @@
+// 
+// Sandblox.Game : Sandbox.Game 
+// 
+@PointClass = sandblox : ""
+[
+	targetname(target_source) : "Name" : : "The name that other entities refer to this entity by."
+]
+
