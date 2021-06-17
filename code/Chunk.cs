@@ -31,7 +31,9 @@ namespace Sandblox
 
 			Rebuild();
 
-			model = Model.Create( mesh );
+			var mb = new ModelBuilder();
+			mb.AddMesh(mesh);
+			model = mb.Create();
 
 			var rot = Rotation.Identity;
 			var transform = new Transform( new Vector3( offset.x, offset.y, offset.z ) * BlockScale, rot, BlockScale );
@@ -64,11 +66,11 @@ namespace Sandblox
 		{
 			int vertexOffset = 0;
 
-			for ( int x = 0; x < ChunkSize; ++x )
+			for ( int z = 0; z < ChunkSize; z++ )
 			{
-				for ( int y = 0; y < ChunkSize; ++y )
+				for ( int y = 0; y < ChunkSize; y++ )
 				{
-					for ( int z = 0; z < ChunkSize; ++z )
+					for ( int x = 0; x < ChunkSize; x++ )
 					{
 						var mx = offset.x + x;
 						var my = offset.y + y;
