@@ -10,11 +10,11 @@ namespace Sandblox
         public Vector3 Normal;
         public Color Color;
 
-        public BlockVertex( uint x, uint y, uint z, Vector3 normal, byte blockType )
+        public BlockVertex( float x, float y, float z, Vector3 normal, Color color )
         {
             Position = new Vector3( x, y, z );
 			Normal = normal;
-            Color = Color.White;
+            Color = color;
         }
 
         public static readonly VertexAttribute[] Layout =

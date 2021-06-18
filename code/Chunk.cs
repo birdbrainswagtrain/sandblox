@@ -1,8 +1,67 @@
 ﻿using Sandbox;
 using System;
+using System.Collections.Generic;
 
 namespace Sandblox
 {
+	class GreedyMeshSlice
+	{
+		private int[,] Data;
+		private readonly int Size;
+
+		public GreedyMeshSlice( int size)
+		{
+			Size = size;
+			Data = new int[size,size];
+		}
+
+		public void Set(int x, int y, int d)
+		{
+			Data[y, x] = d;
+		}
+
+		private int Get(int x, int y)
+		{
+			return Data[y, x];
+		}
+
+		// callback takes (mat x y w h)
+		public IEnumerable<(int,float,float,float,float)> ProcessFaces()
+		{
+			for (int y=0;y<Size;y++ )
+			{
+				int start_x = 0;
+				int current_mat = 0;
+				for (int x=0;x<Size; x++)
+				{
+					int m = Get( x, y );
+					if (current_mat != m)
+					{
+						if (current_mat != 0)
+						{
+							float center_x = (start_x + x - 1) / 2f;
+							float center_y = y;
+							float size_x = x - start_x;
+							float size_y = 1;
+							yield return (current_mat, center_x, center_y, size_x, size_y );
+						}
+						current_mat = m;
+						start_x = x;
+					}
+				}
+
+				if ( current_mat != 0 )
+				{
+					float center_x = (start_x + Size - 1) / 2f;
+					float center_y = y;
+					float size_x = Size - start_x;
+					float size_y = 1;
+					yield return (current_mat, center_x, center_y, size_x, size_y);
+				}
+			}
+		}
+	}
+
 	public class Chunk
 	{
 		public static readonly int ChunkSize = 32;
@@ -31,7 +90,8 @@ namespace Sandblox
 
 			Rebuild();
 
-			var mb = new ModelBuilder();
+			// BUG: new ModelBuilder(); will result in a broken ModelBuilder
+			var mb = Model.Builder;
 			mb.AddMesh(mesh);
 			model = mb.Create();
 
@@ -46,7 +106,6 @@ namespace Sandblox
 			{
 				mesh.DeleteBuffers();
 			}
-
 			if ( sceneObject != null )
 			{
 				sceneObject.Delete();
@@ -68,6 +127,7 @@ namespace Sandblox
 
 			for ( int z = 0; z < ChunkSize; z++ )
 			{
+				var slice = new GreedyMeshSlice(ChunkSize); // TODO just reset on each slice
 				for ( int y = 0; y < ChunkSize; y++ )
 				{
 					for ( int x = 0; x < ChunkSize; x++ )
@@ -86,8 +146,14 @@ namespace Sandblox
 								if ( !map.IsAdjacentBlockEmpty( mx, my, mz, face ) )
 									continue;
 
+								if ( face == 0 )
+								{
+									slice.Set( x, y, blockType );
+									continue;
+								}
+
 								if ( vertexOffset + 6 >= vertices.Length )
-									break;
+									goto End;
 
 								AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, face, blockType );
 								vertexOffset += 6;
@@ -95,8 +161,20 @@ namespace Sandblox
 						}
 					}
 				}
+
+				// go through slice
+				foreach ((int mat, float x, float y, float w, float h) in slice.ProcessFaces())
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, 0, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
 			}
 
+
+			End:
 			mesh.SetVertexRange( 0, vertexOffset );
 		}
 
@@ -122,12 +200,13 @@ namespace Sandblox
 			4, 7, 3, 3, 0, 4,
 		};
 
-		private static void AddQuad( Span<BlockVertex> vertices, int x, int y, int z, int face, byte blockType )
+		private static void AddQuad( Span<BlockVertex> vertices, float x, float y, float z, int face, ushort blockType, float scaleX = 1, float scaleY = 1 )
 		{
+			Vector3 scale = Vector3.One;
 			Vector3 normal = Vector3.Zero;
 			switch ( face )
 			{
-				case 0: normal = new Vector3( 0, 0, 1 ); break;  // Z+
+				case 0: normal = new Vector3( 0, 0, 1 ); scale = new Vector3( scaleX, scaleY, 1 ); break;  // Z+
 				case 1: normal = new Vector3( 0, 0, -1 ); break; // Z-
 
 				case 2: normal = new Vector3( -1, 0, 0 ); break; // X-
@@ -137,11 +216,20 @@ namespace Sandblox
 				case 5: normal = new Vector3( 0, -1, 0 ); break;  // Y-
 			}
 
+			var color = new Color();
+			color.r = Rand.Float();
+			color.g = Rand.Float();
+			color.b = Rand.Float();
+
 			for ( int i = 0; i < 6; ++i )
 			{
 				int vi = BlockIndices[(face * 6) + i];
 				var vOffset = BlockVertices[vi];
-				vertices[i] = new BlockVertex( (uint)(x + vOffset.x), (uint)(y + vOffset.y), (uint)(z + vOffset.z), normal, blockType );
+				vertices[i] = new BlockVertex(
+					x + .5f + ((float)vOffset.x - .5f) * scale.x,
+					y + vOffset.y * scale.y,
+					z + vOffset.z * scale.z,
+					normal, color);
 			}
 		}
 	}
