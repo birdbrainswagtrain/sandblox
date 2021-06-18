@@ -5,7 +5,7 @@ namespace Sandblox
 {
 	public class Map
 	{
-		private readonly byte[] blockdata = null;
+		private readonly ushort[] blockdata = null;
 
 		private readonly static int[] xOffsets = new[] { 0, 0, -1, 0, 1, 0 };
 		private readonly static int[] yOffsets = new[] { 0, 0, 0, 1, 0, -1 };
@@ -25,7 +25,7 @@ namespace Sandblox
 			this.sizeY = sizeY;
 			this.sizeZ = sizeZ;
 
-			blockdata = new byte[this.sizeX * this.sizeY * this.sizeZ];
+			blockdata = new ushort[this.sizeX * this.sizeY * this.sizeZ];
 		}
 
 		public void GeneratePerlin()
@@ -77,7 +77,7 @@ namespace Sandblox
 
 			if ( (blocktype != 0 && curBlocktype == 0) || (blocktype == 0 && curBlocktype != 0) )
 			{
-				blockdata[blockindex] = (byte)blocktype;
+				blockdata[blockindex] = blocktype;
 
 				return true;
 			}
@@ -125,12 +125,12 @@ namespace Sandblox
 			return x + y * sizeX + z * sizeX * sizeY;
 		}
 
-		public byte GetBlockData( int x, int y, int z )
+		public ushort GetBlockData( int x, int y, int z )
 		{
 			return blockdata[GetBlockIndex( x, y, z )];
 		}
 
-		public byte GetBlockData( int index )
+		public ushort GetBlockData( int index )
 		{
 			return blockdata[index];
 		}
@@ -282,7 +282,7 @@ namespace Sandblox
 				// if there is a block at the current position, we have an intersection
 				position3i = new( (int)position3f.x, (int)position3f.y, (int)position3f.z );
 
-				byte blockType = GetBlockData( position3i.x, position3i.y, position3i.z );
+				ushort blockType = GetBlockData( position3i.x, position3i.y, position3i.z );
 
 				if ( blockType != 0 )
 				{
@@ -313,7 +313,7 @@ namespace Sandblox
 				hitPosition3f.z = 0.0f;
 				IntVector3 blockHitPosition = new( (int)hitPosition3f.x, (int)hitPosition3f.y, (int)hitPosition3f.z );
 
-				byte blockType = GetBlockData( blockHitPosition.x, blockHitPosition.y, blockHitPosition.z );
+				ushort blockType = GetBlockData( blockHitPosition.x, blockHitPosition.y, blockHitPosition.z );
 
 				if ( blockType == 0 )
 				{

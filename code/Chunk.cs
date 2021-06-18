@@ -30,33 +30,49 @@ namespace Sandblox
 		{
 			for (int y=0;y<Size;y++ )
 			{
-				int start_x = 0;
-				int current_mat = 0;
 				for (int x=0;x<Size; x++)
 				{
 					int m = Get( x, y );
-					if (current_mat != m)
+					if (m != 0)
 					{
-						if (current_mat != 0)
+						int start_x = x;
+						int end_x = x;
+						Set( x, y, 0 );
+						while (end_x+1 < Size && Get(end_x+1,y) == m)
 						{
-							float center_x = (start_x + x - 1) / 2f;
-							float center_y = y;
-							float size_x = x - start_x;
-							float size_y = 1;
-							yield return (current_mat, center_x, center_y, size_x, size_y );
+							end_x++;
+							Set( end_x, y, 0 );
 						}
-						current_mat = m;
-						start_x = x;
-					}
-				}
 
-				if ( current_mat != 0 )
-				{
-					float center_x = (start_x + Size - 1) / 2f;
-					float center_y = y;
-					float size_x = Size - start_x;
-					float size_y = 1;
-					yield return (current_mat, center_x, center_y, size_x, size_y);
+						int start_y = y;
+						int end_y = y;
+
+						while (end_y +1 < Size)
+						{
+							int next_y = end_y + 1;
+							// Check row.
+							for (int ix=start_x;ix<=end_x;ix++)
+							{
+								if (Get(ix, next_y) != m)
+								{
+									goto End;
+								}
+							}
+							// Row is good, clear it.
+							for ( int ix = start_x; ix <= end_x; ix++ )
+							{
+								Set( ix, next_y, 0 );
+							}
+							end_y = next_y;
+						}
+
+						End:
+						float center_x = (start_x + end_x) / 2f;
+						float center_y = (start_y + end_y) / 2f;
+						float size_x = end_x - start_x + 1;
+						float size_y = end_y - start_y + 1;
+						yield return (m, center_x, center_y, size_x, size_y);
+					}
 				}
 			}
 		}
@@ -67,7 +83,7 @@ namespace Sandblox
 		public static readonly int ChunkSize = 32;
 		private static readonly int MaxFaceCount = 7000;
 
-		public const float BlockScale = 32;
+		public const float BlockScale = 16;
 
 		private readonly Map map;
 		private readonly Model model;
@@ -127,7 +143,10 @@ namespace Sandblox
 
 			for ( int z = 0; z < ChunkSize; z++ )
 			{
-				var slice = new GreedyMeshSlice(ChunkSize); // TODO just reset on each slice
+				// TODO just reset on each slice
+				// TODO fold both directions into a single slice
+				var slice_top = new GreedyMeshSlice(ChunkSize);
+				var slice_bot = new GreedyMeshSlice( ChunkSize );
 				for ( int y = 0; y < ChunkSize; y++ )
 				{
 					for ( int x = 0; x < ChunkSize; x++ )
@@ -148,7 +167,13 @@ namespace Sandblox
 
 								if ( face == 0 )
 								{
-									slice.Set( x, y, blockType );
+									slice_top.Set( x, y, blockType );
+									continue;
+								}
+
+								if ( face == 1 )
+								{
+									slice_bot.Set( x, y, blockType );
 									continue;
 								}
 
@@ -162,13 +187,21 @@ namespace Sandblox
 					}
 				}
 
-				// go through slice
-				foreach ((int mat, float x, float y, float w, float h) in slice.ProcessFaces())
+				foreach ((int mat, float x, float y, float w, float h) in slice_top.ProcessFaces())
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
 
 					AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, 0, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
+
+				foreach ( (int mat, float x, float y, float w, float h) in slice_bot.ProcessFaces() )
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, 1, (ushort)mat, w, h );
 					vertexOffset += 6;
 				}
 			}
@@ -207,7 +240,7 @@ namespace Sandblox
 			switch ( face )
 			{
 				case 0: normal = new Vector3( 0, 0, 1 ); scale = new Vector3( scaleX, scaleY, 1 ); break;  // Z+
-				case 1: normal = new Vector3( 0, 0, -1 ); break; // Z-
+				case 1: normal = new Vector3( 0, 0, -1 ); scale = new Vector3( scaleX, scaleY, 1 ); break; // Z-
 
 				case 2: normal = new Vector3( -1, 0, 0 ); break; // X-
 				case 3: normal = new Vector3( 0, 1, 0 ); break;  // Y+
@@ -216,19 +249,30 @@ namespace Sandblox
 				case 5: normal = new Vector3( 0, -1, 0 ); break;  // Y-
 			}
 
-			var color = new Color();
-			color.r = Rand.Float();
-			color.g = Rand.Float();
-			color.b = Rand.Float();
+			var color = Color.White;
+			switch (blockType)
+			{
+				case 1:  color = Color.Parse( "#aaaaaa" ).Value; break; // CONCRETE
+				case 2:  color = Color.Parse( "#82372b" ).Value; break; // BRICK
+				case 4:  color = Color.Parse( "#ffff00" ).Value; break; // BUILDING TEMPLATE?
+				case 8:  color = Color.Parse( "#eddac0" ).Value; break; // PLASTER
+				case 10: color = Color.Parse( "#59a12d" ).Value; break; // GRASS
+				case 20: color = Color.Parse( "#ff00dd" ).Value; break; // UNKNOWN
+
+				default: Log.Info( "?? " + blockType ); break;
+			}
+			//color.r += Rand.Float( -.1f, .1f );
+			//color.g += Rand.Float( -.1f, .1f );
+			//color.b += Rand.Float( -.1f, .1f );
 
 			for ( int i = 0; i < 6; ++i )
 			{
 				int vi = BlockIndices[(face * 6) + i];
 				var vOffset = BlockVertices[vi];
 				vertices[i] = new BlockVertex(
-					x + .5f + ((float)vOffset.x - .5f) * scale.x,
-					y + vOffset.y * scale.y,
-					z + vOffset.z * scale.z,
+					x + .5f + (vOffset.x - .5f) * scale.x,
+					y + .5f + (vOffset.y - .5f) * scale.y,
+					z + .5f + (vOffset.z - .5f) * scale.z,
 					normal, color);
 			}
 		}

@@ -619,10 +619,10 @@ namespace Sandblox.Import
                 return 5;
 
             if (str.Contains("GRASS"))
-                return 6;
+                return COLOR_GRASS;
 
             if (str.Contains("NATURE"))
-                return 7;
+                return COLOR_GRASS;
 
             if (str.Contains("PLASTER"))
                 return 8;
