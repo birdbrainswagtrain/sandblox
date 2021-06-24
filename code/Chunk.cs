@@ -97,7 +97,7 @@ namespace Sandblox
 			this.offset = offset;
 
 			var material = Material.Load( "materials/default/vertex_color.vmat" );
-			mesh = Mesh.Create( material );
+			mesh = new Mesh( material );
 			mesh.CreateVertexBuffer<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
 
 			var boundsMin = Vector3.Zero;
@@ -249,18 +249,7 @@ namespace Sandblox
 				case 5: normal = new Vector3( 0, -1, 0 ); break;  // Y-
 			}
 
-			var color = Color.White;
-			switch (blockType)
-			{
-				case 1:  color = Color.Parse( "#aaaaaa" ).Value; break; // CONCRETE
-				case 2:  color = Color.Parse( "#82372b" ).Value; break; // BRICK
-				case 4:  color = Color.Parse( "#ffff00" ).Value; break; // BUILDING TEMPLATE?
-				case 8:  color = Color.Parse( "#eddac0" ).Value; break; // PLASTER
-				case 10: color = Color.Parse( "#59a12d" ).Value; break; // GRASS
-				case 20: color = Color.Parse( "#ff00dd" ).Value; break; // UNKNOWN
-
-				default: Log.Info( "?? " + blockType ); break;
-			}
+			var color = Color16.ToColor(blockType);
 			//color.r += Rand.Float( -.1f, .1f );
 			//color.g += Rand.Float( -.1f, .1f );
 			//color.b += Rand.Float( -.1f, .1f );

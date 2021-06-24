@@ -9,8 +9,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 
 using Sandbox;
+
+using Sandblox;
 
 namespace Sandblox.Import
 {
@@ -142,12 +145,17 @@ namespace Sandblox.Import
         const int LUMP_TEXDATA_STRING_DATA = 43;
         const int LUMP_TEXDATA_STRING_TABLE = 44;
 
-		const ushort COLOR_GRASS = 10;
+		static Dictionary<string, JsonElement> MATERIAL_COLOR_LUT = null;
 
 		public static ImportWorld Load(string filename, float scale)
         {
             var world = new ImportWorld();
             world.Scale = scale;
+
+			if ( MATERIAL_COLOR_LUT == null)
+			{
+				MATERIAL_COLOR_LUT = FileSystem.Mounted.ReadJson<Dictionary<string, JsonElement>>( "files/colors.json" );
+			}
 
             using (var reader = new BinaryReader( FileSystem.Mounted.OpenRead( filename ) ) )
             {
@@ -414,7 +422,8 @@ namespace Sandblox.Import
 
                 // TODO move this cruft to it's own function
                 Log.Info("Voxelizing displacements...");
-                foreach (var face in faces)
+				ushort COLOR_GRASS = Color16.FromInt( 0x46a13a );
+				foreach (var face in faces)
                 {
                     if (face.dispinfo != -1)
                     {
@@ -583,25 +592,57 @@ namespace Sandblox.Import
                 int data_idx = texdata[info_idx];
                 string data_str = texstrings[data_idx];
 
-                ushort mat = get_material_from_texture_name(data_str);
+                ushort mat = GetMaterialFromTextureName(data_str);
                 materials.Add(mat);
             }
 
             return materials.ToArray();
         }
 
-        static ushort get_material_from_texture_name(string str)
+        static ushort GetMaterialFromTextureName(string str)
         {
-            str = str.ToUpper();
+            str = str.ToLower();
 
-            if (str.StartsWith("TOOLS/"))
+			ushort res = 0;
+			if (MATERIAL_COLOR_LUT.TryGetValue(str, out JsonElement lut_res ))
+			{
+				if (lut_res.ValueKind == JsonValueKind.Number)
+				{
+					res = Color16.FromInt( lut_res.GetInt32() );
+				} else
+				{
+					Log.Error( "THIS IS AN ARRAY!" );
+				}
+			}
+
+			if (str.Contains("skybox"))
+			{
+				//Log.Warning( "SKY: " + str );
+				return 0;
+			}
+
+			if (res == 0)
+			{
+				if ( str.Contains( "white" ) )
+					return Color16.FromInt( 0xffffff );
+
+
+				if ( str.Contains( "concrete" ) )
+					return Color16.FromInt( 0x666666 );
+				if ( str.Contains( "plaster" ) )
+					return Color16.FromInt( 0xd3a3e6 );
+				if ( str.Contains( "water" ) )
+					return Color16.FromInt( 0x5472cc );
+				Log.Warning( "No color: " + str );
+			}
+
+			return res;
+
+            /*if (str.StartsWith("TOOLS/"))
                 return 0;
 
             //if (str.StartsWith("TOOLS/"))
             //    return null;
-
-            if (str.Contains("CONCRETE"))
-                return 1;
 
             if (str.Contains("BRICK"))
                 return 2;
@@ -638,10 +679,9 @@ namespace Sandblox.Import
 
             // =>
             if (str == "GM_CONSTRUCT/WALL_TOP" || str == "GM_CONSTRUCT/WALL_BOTTOM")
-                return 5;
+                return 5;*/
 
-			Log.Info( ">>> "+ str);
-            return 20;
+			//Log.Info( ">>> "+ str);
         }
 
         static void process_planes(VBSP_Plane[] planes, ImportWorld world, ushort[] materials)

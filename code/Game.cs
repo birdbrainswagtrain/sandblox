@@ -11,6 +11,14 @@ namespace Sandblox
 		private readonly Map map;
 		private readonly Chunk[] chunks;
 
+		[ClientCmd("fix_light")]
+		public static void FixLightCmd()
+		{
+			var sun = new SunLight( new Vector3( 1, 0, 0 ), new Color( 1, 0, 0 ) );
+			sun.LightColor = Color.White;
+			sun.WorldAng = new Angles( -40, 60, 0 );
+		}
+
 		public Game()
 		{
 			if ( IsServer )
@@ -19,7 +27,7 @@ namespace Sandblox
 			}
 
 			var sw = Stopwatch.StartNew();
-			var loaded = Import.VBSP.Load( "gm_construct_9.bsp", Chunk.BlockScale );
+			var loaded = Import.VBSP.Load( "files/gm_construct_9.bsp", Chunk.BlockScale );
 
 			int max_x = Int32.MinValue;
 			int max_y = Int32.MinValue;
@@ -41,8 +49,7 @@ namespace Sandblox
 				min_y = Math.Min( min_y, pos.Item2 * 32 );
 				min_z = Math.Min( min_z, pos.Item3 * 32 );
 			}
-			Log.Warning( $". {min_x} {min_y} {min_z}" );
-			Log.Warning( $"--> {sw.Elapsed.TotalMilliseconds}" );
+			Log.Warning( $"Time: {sw.Elapsed.TotalMilliseconds}" );
 
 			map = new Map( max_x - min_x, max_y - min_y, max_z - min_z );
 
