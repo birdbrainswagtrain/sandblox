@@ -27,7 +27,7 @@ namespace Sandblox
 			}
 
 			var sw = Stopwatch.StartNew();
-			var loaded = Import.VBSP.Load( "files/gm_construct_9.bsp", Chunk.BlockScale );
+			var loaded = Import.VBSP.Load( "files/rp_downtown_v2.bsp", Chunk.BlockScale );
 
 			int max_x = Int32.MinValue;
 			int max_y = Int32.MinValue;

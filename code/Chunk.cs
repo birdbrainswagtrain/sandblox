@@ -137,12 +137,11 @@ namespace Sandblox
 		{
 			int vertexOffset = 0;
 
+			// TODO fold both directions into a single slice
+			var slice_top = new GreedyMeshSlice(ChunkSize);
+			var slice_bot = new GreedyMeshSlice( ChunkSize );
 			for ( int z = 0; z < ChunkSize; z++ )
 			{
-				// TODO just reset on each slice
-				// TODO fold both directions into a single slice
-				var slice_top = new GreedyMeshSlice(ChunkSize);
-				var slice_bot = new GreedyMeshSlice( ChunkSize );
 				for ( int y = 0; y < ChunkSize; y++ )
 				{
 					for ( int x = 0; x < ChunkSize; x++ )
@@ -156,52 +155,137 @@ namespace Sandblox
 
 						if ( blockType != 0 )
 						{
-							for ( int face = 0; face < 6; ++face )
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 0 ) )
 							{
-								if ( !map.IsAdjacentBlockEmpty( mx, my, mz, face ) )
-									continue;
+								slice_top.Set( x, y, blockType );
+								continue;
+							}
 
-								if ( face == 0 )
-								{
-									slice_top.Set( x, y, blockType );
-									continue;
-								}
-
-								if ( face == 1 )
-								{
-									slice_bot.Set( x, y, blockType );
-									continue;
-								}
-
-								if ( vertexOffset + 6 >= vertices.Length )
-									goto End;
-
-								AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, face, blockType );
-								vertexOffset += 6;
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 1 ) )
+							{
+								slice_bot.Set( x, y, blockType );
+								continue;
 							}
 						}
 					}
 				}
 
-				foreach ((int mat, float x, float y, float w, float h) in slice_top.ProcessFaces())
+				foreach ((int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces())
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
 
-					AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, 0, (ushort)mat, w, h );
+					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, 0, (ushort)mat, w, h );
 					vertexOffset += 6;
 				}
 
-				foreach ( (int mat, float x, float y, float w, float h) in slice_bot.ProcessFaces() )
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
 
-					AddQuad( vertices.Slice( vertexOffset, 6 ), x, y, z, 1, (ushort)mat, w, h );
+					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, 1, (ushort)mat, w, h );
 					vertexOffset += 6;
 				}
 			}
 
+			for ( int y = 0; y < ChunkSize; y++ )
+			{
+				for ( int z = 0; z < ChunkSize; z++ )
+				{
+					for ( int x = 0; x < ChunkSize; x++ )
+					{
+						var mx = offset.x + x;
+						var my = offset.y + y;
+						var mz = offset.z + z;
+
+						var blockIndex = map.GetBlockIndex( mx, my, mz );
+						var blockType = map.GetBlockData( blockIndex );
+
+						if ( blockType != 0 )
+						{
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 3 ) )
+							{
+								slice_top.Set( x, z, blockType );
+								continue;
+							}
+
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 5 ) )
+							{
+								slice_bot.Set( x, z, blockType );
+								continue;
+							}
+						}
+					}
+				}
+
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces() )
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, 3, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
+
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, 5, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
+			}
+
+			for ( int x = 0; x < ChunkSize; x++ )
+			{
+				for ( int z = 0; z < ChunkSize; z++ )
+				{
+					for ( int y = 0; y < ChunkSize; y++ )
+					{
+						var mx = offset.x + x;
+						var my = offset.y + y;
+						var mz = offset.z + z;
+
+						var blockIndex = map.GetBlockIndex( mx, my, mz );
+						var blockType = map.GetBlockData( blockIndex );
+
+						if ( blockType != 0 )
+						{
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 2 ) )
+							{
+								slice_top.Set( y, z, blockType );
+								continue;
+							}
+
+							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 4 ) )
+							{
+								slice_bot.Set( y, z, blockType );
+								continue;
+							}
+						}
+					}
+				}
+
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces() )
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, 2, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
+
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
+				{
+					if ( vertexOffset + 6 >= vertices.Length )
+						goto End;
+
+					AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, 4, (ushort)mat, w, h );
+					vertexOffset += 6;
+				}
+			}
 
 			End:
 			mesh.SetVertexRange( 0, vertexOffset );
@@ -238,17 +322,17 @@ namespace Sandblox
 				case 0: normal = new Vector3( 0, 0, 1 ); scale = new Vector3( scaleX, scaleY, 1 ); break;  // Z+
 				case 1: normal = new Vector3( 0, 0, -1 ); scale = new Vector3( scaleX, scaleY, 1 ); break; // Z-
 
-				case 2: normal = new Vector3( -1, 0, 0 ); break; // X-
-				case 3: normal = new Vector3( 0, 1, 0 ); break;  // Y+
+				case 2: normal = new Vector3( -1, 0, 0 ); scale = new Vector3( 1, scaleX, scaleY ); break; // X-
+				case 3: normal = new Vector3( 0, 1, 0 ); scale = new Vector3( scaleX, 1, scaleY ); break;  // Y+
 
-				case 4: normal = new Vector3( 1, 0, 0 ); break; // X+
-				case 5: normal = new Vector3( 0, -1, 0 ); break;  // Y-
+				case 4: normal = new Vector3( 1, 0, 0 ); scale = new Vector3( 1, scaleX, scaleY ); break; // X+
+				case 5: normal = new Vector3( 0, -1, 0 ); scale = new Vector3( scaleX, 1, scaleY ); break;  // Y-
 			}
 
 			var color = Color16.ToColor(blockType);
-			//color.r += Rand.Float( -.1f, .1f );
-			//color.g += Rand.Float( -.1f, .1f );
-			//color.b += Rand.Float( -.1f, .1f );
+			//color.r = Rand.Float( );
+			//color.g = Rand.Float( );
+			//color.b = Rand.Float( );
 
 			for ( int i = 0; i < 6; ++i )
 			{

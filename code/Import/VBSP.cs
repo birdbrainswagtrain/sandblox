@@ -617,7 +617,11 @@ namespace Sandblox.Import
 
 			if (str.Contains("skybox"))
 			{
-				//Log.Warning( "SKY: " + str );
+				return 0;
+			}
+
+			if (str == "tools/toolsnodraw" || str == "tools/toolsinvisible" )
+			{
 				return 0;
 			}
 
@@ -625,7 +629,8 @@ namespace Sandblox.Import
 			{
 				if ( str.Contains( "white" ) )
 					return Color16.FromInt( 0xffffff );
-
+				if ( str.Contains( "black" ) )
+					return Color16.FromInt( 0 );
 
 				if ( str.Contains( "concrete" ) )
 					return Color16.FromInt( 0x666666 );
@@ -633,7 +638,13 @@ namespace Sandblox.Import
 					return Color16.FromInt( 0xd3a3e6 );
 				if ( str.Contains( "water" ) )
 					return Color16.FromInt( 0x5472cc );
+
 				Log.Warning( "No color: " + str );
+			}
+
+			if ( str.StartsWith( "tools/" ) )
+			{
+				Log.Error( "--> " + str );
 			}
 
 			return res;
