@@ -1,8 +1,10 @@
-﻿using Sandbox;
+﻿#nullable enable
+
+using Sandbox;
 using System;
 using System.Collections.Generic;
 
-namespace Sandblox
+namespace Cubism
 {
 	class GreedyMeshSlice
 	{
@@ -78,58 +80,85 @@ namespace Sandblox
 		}
 	}
 
+	public enum BlockFace : int
+	{
+		Invalid = -1,
+		ZPos = 0,
+		ZNeg = 1,
+		XNeg = 2,
+		YPos = 3,
+		XPos = 4,
+		YNeg = 5,
+	};
+
 	public class Chunk
 	{
-		public static readonly int ChunkSize = 32;
-		private static readonly int MaxFaceCount = 7000;
+		public const int ChunkSize = 32;
+		private const int MaxFaceCount = 7000;
 
 		public const float BlockScale = 16;
 
-		private readonly Map map;
-		private readonly Model model;
-		private readonly Mesh mesh;
-		private readonly IntVector3 offset;
-		private SceneObject sceneObject;
+		private readonly Model Model;
+		private readonly Mesh Mesh;
+		private SceneObject? SceneObject;
 
-		public Chunk( Map map, IntVector3 offset )
+		private readonly IntVector3 Offset;
+
+		// Assuming we can remove some bounds checks by using a single-dimensional array.
+		private ushort[] Data = new ushort[ChunkSize * ChunkSize * ChunkSize];
+
+		public Chunk( IntVector3 offset )
 		{
-			this.map = map;
-			this.offset = offset;
+			this.Offset = offset;
 
 			var material = Material.Load( "materials/default/vertex_color.vmat" );
-			mesh = new Mesh( material );
-			mesh.CreateVertexBuffer<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
+			Mesh = new Mesh( material );
+			Mesh.CreateVertexBuffer<BlockVertex>( MaxFaceCount * 6, BlockVertex.Layout );
 
 			var boundsMin = Vector3.Zero;
 			var boundsMax = boundsMin + (new Vector3( ChunkSize ) * BlockScale);
-			mesh.SetBounds( boundsMin, boundsMax );
+			Mesh.SetBounds( boundsMin, boundsMax );
 
 			Rebuild();
 
 			// BUG: new ModelBuilder(); will result in a broken ModelBuilder
 			var mb = Model.Builder;
-			mb.AddMesh(mesh);
-			model = mb.Create();
+			mb.AddMesh(Mesh);
+			Model = mb.Create();
 
 			var rot = Rotation.Identity;
 			var transform = new Transform( new Vector3( offset.x, offset.y, offset.z ) * BlockScale, rot, BlockScale );
-			sceneObject = new SceneObject( model, transform );
+			SceneObject = new SceneObject( Model, transform );
 		}
 
 		public void Delete()
 		{
-			if ( sceneObject != null )
+			if ( SceneObject != null )
 			{
-				sceneObject.Delete();
-				sceneObject = null;
+				SceneObject.Delete();
+				SceneObject = null;
 			}
 		}
 
-		public void Rebuild()
+		public ushort GetBlock( int x, int y, int z )
 		{
-			if ( mesh.IsValid )
+			return Data[x + y * ChunkSize + z * ChunkSize * ChunkSize];
+		}
+
+		public void SetBlock( int x, int y, int z, ushort blocktype )
+		{
+			Data[x + y * ChunkSize + z * ChunkSize * ChunkSize] = blocktype;
+		}
+
+		public Chunk? PrevChunkX;
+		public Chunk? PrevChunkY;
+		public Chunk? PrevChunkZ;
+
+		public void Rebuild( )
+		{
+			if ( Mesh.IsValid )
 			{
-				mesh.LockVertexBuffer<BlockVertex>( Rebuild );
+				Mesh.LockVertexBuffer<BlockVertex>( Rebuild );
 			}
 		}
 
@@ -137,179 +166,186 @@ namespace Sandblox
 		{
 			int vertexOffset = 0;
 
-			// TODO fold both directions into a single slice
-			var slice_top = new GreedyMeshSlice(ChunkSize);
-			var slice_bot = new GreedyMeshSlice( ChunkSize );
+			var slice = new GreedyMeshSlice( ChunkSize );
+
+			// Z Faces
 			for ( int z = 0; z < ChunkSize; z++ )
 			{
 				for ( int y = 0; y < ChunkSize; y++ )
 				{
 					for ( int x = 0; x < ChunkSize; x++ )
 					{
-						var mx = offset.x + x;
-						var my = offset.y + y;
-						var mz = offset.z + z;
-
-						var blockIndex = map.GetBlockIndex( mx, my, mz );
-						var blockType = map.GetBlockData( blockIndex );
-
-						if ( blockType != 0 )
+						ushort blockType = GetBlock( x, y, z );
+						ushort blockTypePrev;
+						if (z == 0)
 						{
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 0 ) )
+							if (PrevChunkZ != null)
 							{
-								slice_top.Set( x, y, blockType );
-								continue;
+								blockTypePrev = PrevChunkZ.GetBlock( x, y, ChunkSize - 1 );
+							} else
+							{
+								blockTypePrev = 0;
 							}
+						} else
+						{
+							blockTypePrev = GetBlock( x, y, z - 1 );
+						}
 
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 1 ) )
-							{
-								slice_bot.Set( x, y, blockType );
-								continue;
-							}
+						if ( blockType == 0 && blockTypePrev != 0 )
+						{
+							slice.Set( x, y, blockTypePrev );
+						} else if ( blockType != 0 && blockTypePrev == 0 )
+						{
+							slice.Set( x, y, -blockType );
 						}
 					}
 				}
 
-				foreach ((int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces())
+				foreach ((int mat, float fx, float fy, float w, float h) in slice.ProcessFaces())
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
-
-					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, 0, (ushort)mat, w, h );
-					vertexOffset += 6;
-				}
-
-				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
-				{
-					if ( vertexOffset + 6 >= vertices.Length )
-						goto End;
-
-					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, 1, (ushort)mat, w, h );
+					
+					if (mat > 0)
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, (int)BlockFace.ZPos, (ushort)mat, w, h );
+					} else
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), fx, fy, z, (int)BlockFace.ZNeg, (ushort)-mat, w, h );
+					}
 					vertexOffset += 6;
 				}
 			}
 
+			// Y Faces
 			for ( int y = 0; y < ChunkSize; y++ )
 			{
 				for ( int z = 0; z < ChunkSize; z++ )
 				{
 					for ( int x = 0; x < ChunkSize; x++ )
 					{
-						var mx = offset.x + x;
-						var my = offset.y + y;
-						var mz = offset.z + z;
-
-						var blockIndex = map.GetBlockIndex( mx, my, mz );
-						var blockType = map.GetBlockData( blockIndex );
-
-						if ( blockType != 0 )
+						ushort blockType = GetBlock( x, y, z );
+						ushort blockTypePrev;
+						if ( y == 0 )
 						{
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 3 ) )
+							if ( PrevChunkY != null )
 							{
-								slice_top.Set( x, z, blockType );
-								continue;
+								blockTypePrev = PrevChunkY.GetBlock( x, ChunkSize - 1, z );
 							}
+							else
+							{
+								blockTypePrev = 0;
+							}
+						}
+						else
+						{
+							blockTypePrev = GetBlock( x, y - 1, z );
+						}
 
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 5 ) )
-							{
-								slice_bot.Set( x, z, blockType );
-								continue;
-							}
+						if ( blockType == 0 && blockTypePrev != 0 )
+						{
+							slice.Set( x, z, blockTypePrev );
+						}
+						else if ( blockType != 0 && blockTypePrev == 0 )
+						{
+							slice.Set( x, z, -blockType );
 						}
 					}
 				}
 
-				foreach ( (int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces() )
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice.ProcessFaces() )
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
 
-					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, 3, (ushort)mat, w, h );
-					vertexOffset += 6;
-				}
-
-				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
-				{
-					if ( vertexOffset + 6 >= vertices.Length )
-						goto End;
-
-					AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, 5, (ushort)mat, w, h );
+					if ( mat > 0 )
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, (int)BlockFace.YPos, (ushort)mat, w, h );
+					}
+					else
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), fx, y, fy, (int)BlockFace.YNeg, (ushort)-mat, w, h );
+					}
 					vertexOffset += 6;
 				}
 			}
 
+			// X Faces
 			for ( int x = 0; x < ChunkSize; x++ )
 			{
 				for ( int z = 0; z < ChunkSize; z++ )
 				{
 					for ( int y = 0; y < ChunkSize; y++ )
 					{
-						var mx = offset.x + x;
-						var my = offset.y + y;
-						var mz = offset.z + z;
-
-						var blockIndex = map.GetBlockIndex( mx, my, mz );
-						var blockType = map.GetBlockData( blockIndex );
-
-						if ( blockType != 0 )
+						ushort blockType = GetBlock( x, y, z );
+						ushort blockTypePrev;
+						if ( x == 0 )
 						{
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 2 ) )
+							if ( PrevChunkX != null )
 							{
-								slice_top.Set( y, z, blockType );
-								continue;
+								blockTypePrev = PrevChunkX.GetBlock( ChunkSize - 1, y, z );
 							}
+							else
+							{
+								blockTypePrev = 0;
+							}
+						}
+						else
+						{
+							blockTypePrev = GetBlock( x - 1, y, z );
+						}
 
-							if ( map.IsAdjacentBlockEmpty( mx, my, mz, 4 ) )
-							{
-								slice_bot.Set( y, z, blockType );
-								continue;
-							}
+						if ( blockType == 0 && blockTypePrev != 0 )
+						{
+							slice.Set( y, z, blockTypePrev );
+						}
+						else if ( blockType != 0 && blockTypePrev == 0 )
+						{
+							slice.Set( y, z, -blockType );
 						}
 					}
 				}
 
-				foreach ( (int mat, float fx, float fy, float w, float h) in slice_top.ProcessFaces() )
+				foreach ( (int mat, float fx, float fy, float w, float h) in slice.ProcessFaces() )
 				{
 					if ( vertexOffset + 6 >= vertices.Length )
 						goto End;
 
-					AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, 2, (ushort)mat, w, h );
-					vertexOffset += 6;
-				}
-
-				foreach ( (int mat, float fx, float fy, float w, float h) in slice_bot.ProcessFaces() )
-				{
-					if ( vertexOffset + 6 >= vertices.Length )
-						goto End;
-
-					AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, 4, (ushort)mat, w, h );
+					if ( mat > 0 )
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, (int)BlockFace.XPos, (ushort)mat, w, h );
+					}
+					else
+					{
+						AddQuad( vertices.Slice( vertexOffset, 6 ), x, fx, fy, (int)BlockFace.XNeg, (ushort)-mat, w, h );
+					}
 					vertexOffset += 6;
 				}
 			}
 
 			End:
-			mesh.SetVertexRange( 0, vertexOffset );
+			Mesh.SetVertexRange( 0, vertexOffset );
 		}
 
 		static readonly IntVector3[] BlockVertices = new[]
 		{
-			new IntVector3( 0, 0, 1 ),
-			new IntVector3( 0, 1, 1 ),
-			new IntVector3( 1, 1, 1 ),
-			new IntVector3( 1, 0, 1 ),
-			new IntVector3( 0, 0, 0 ),
-			new IntVector3( 0, 1, 0 ),
-			new IntVector3( 1, 1, 0 ),
-			new IntVector3( 1, 0, 0 ),
+			new IntVector3( 0, 0, 1 ), // 0
+			new IntVector3( 0, 1, 1 ), // 1
+			new IntVector3( 1, 1, 1 ), // 2 (unused)
+			new IntVector3( 1, 0, 1 ), // 3
+			new IntVector3( 0, 0, 0 ), // 4
+			new IntVector3( 0, 1, 0 ), // 5
+			new IntVector3( 1, 1, 0 ), // 6
+			new IntVector3( 1, 0, 0 ), // 7
 		};
 
 		static readonly int[] BlockIndices = new[]
 		{
-			2, 1, 0, 0, 3, 2,
+			5, 7, 6, 7, 5, 4,
 			5, 6, 7, 7, 4, 5,
 			5, 4, 0, 0, 1, 5,
-			6, 5, 1, 1, 2, 6,
-			7, 6, 2, 2, 3, 7,
+			4, 3, 7, 3, 4, 0,
+			5, 0, 4, 1, 0, 5,
 			4, 7, 3, 3, 0, 4,
 		};
 

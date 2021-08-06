@@ -1,7 +1,7 @@
 ﻿using Sandbox;
 using System.Runtime.InteropServices;
 
-namespace Sandblox
+namespace Cubism
 {
     [StructLayout( LayoutKind.Sequential )]
     public struct BlockVertex

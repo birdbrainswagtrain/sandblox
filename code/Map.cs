@@ -1,153 +1,88 @@
 ﻿using Sandbox;
 using System;
+using System.Collections.Generic;
 
-namespace Sandblox
+namespace Cubism
 {
 	public class Map
 	{
-		private readonly ushort[] blockdata = null;
+		private Dictionary<IntVector3, Chunk> Chunks = new Dictionary<IntVector3, Chunk>();
+		//private readonly static int[] xOffsets = new[] { 0, 0, -1, 0, 1, 0 };
+		//private readonly static int[] yOffsets = new[] { 0, 0, 0, 1, 0, -1 };
+		//private readonly static int[] zOffsets = new[] { 1, -1, 0, 0, 0, 0 };
 
-		private readonly static int[] xOffsets = new[] { 0, 0, -1, 0, 1, 0 };
-		private readonly static int[] yOffsets = new[] { 0, 0, 0, 1, 0, -1 };
-		private readonly static int[] zOffsets = new[] { 1, -1, 0, 0, 0, 0 };
-
-		private readonly int sizeX;
-		private readonly int sizeY;
-		private readonly int sizeZ;
-
-		public int SizeX => sizeX;
-		public int SizeY => sizeY;
-		public int SizeZ => sizeZ;
-
-		public Map( int sizeX, int sizeY, int sizeZ )
+		public Map()
 		{
-			this.sizeX = sizeX;
-			this.sizeY = sizeY;
-			this.sizeZ = sizeZ;
 
-			blockdata = new ushort[this.sizeX * this.sizeY * this.sizeZ];
 		}
 
-		public void GeneratePerlin()
+		public ushort GetBlock( int x, int y, int z )
 		{
-			for ( int x = 0; x < sizeX; ++x )
-			{
-				for ( int y = 0; y < sizeY; ++y )
-				{
-					int height = (int)((sizeZ / 2) * (Noise.Perlin( (x * 32) * 0.001f, (y * 32) * 0.001f, 0 ) + 0.5f) * 0.5f);
-					if ( height <= 0 ) height = 1;
-					if ( height > sizeZ ) height = sizeZ;
+			// I am not sure C# is smart enough to optimize these, especially in debug mode.
+			int chunk_x = x / Chunk.ChunkSize;
+			int chunk_y = y / Chunk.ChunkSize;
+			int chunk_z = z / Chunk.ChunkSize;
 
-					for ( int z = 0; z < sizeZ; ++z )
-					{
-						int blockIndex = GetBlockIndex( x, y, z );
-						blockdata[blockIndex] = (byte)(z < height ? (Rand.Int( 2, 2 )) : 0);
-					}
-				}
-			}
+			int local_x = x % Chunk.ChunkSize;
+			int local_y = y % Chunk.ChunkSize;
+			int local_z = z % Chunk.ChunkSize;
+
+			var chunk_pos = new IntVector3( chunk_x, chunk_y, chunk_z );
+			var chunk = GetOrInitChunk( chunk_pos );
+			return chunk.GetBlock( local_x, local_y, local_z );
 		}
 
-		public void GenerateGround()
+		public void SetBlock( int x, int y, int z, ushort blocktype)
 		{
-			for ( int x = 0; x < sizeX; ++x )
-			{
-				for ( int y = 0; y < sizeY; ++y )
-				{
-					int height = 10;
-					if ( height <= 0 ) height = 1;
-					if ( height > sizeZ ) height = sizeZ;
+			// I am not sure C# is smart enough to optimize these, especially in debug mode.
+			int chunk_x = x / Chunk.ChunkSize;
+			int chunk_y = y / Chunk.ChunkSize;
+			int chunk_z = z / Chunk.ChunkSize;
 
-					for ( int z = 0; z < sizeZ; ++z )
-					{
-						int blockIndex = GetBlockIndex( x, y, z );
-						blockdata[blockIndex] = (byte)(z < height ? (Rand.Int( 1, 5 )) : 0);
-					}
-				}
-			}
+			int local_x = x % Chunk.ChunkSize;
+			int local_y = y % Chunk.ChunkSize;
+			int local_z = z % Chunk.ChunkSize;
+
+			var chunk_pos = new IntVector3( chunk_x, chunk_y, chunk_z );
+			var chunk = GetOrInitChunk( chunk_pos );
+			chunk.SetBlock( local_x, local_y, local_z, blocktype );
 		}
 
-		public bool SetBlock( int x, int y, int z, ushort blocktype)
+		private Chunk GetOrInitChunk( in IntVector3 chunk_pos )
 		{
-			if ( x < 0 || x >= sizeX ) return false;
-			if ( y < 0 || y >= sizeY ) return false;
-			if ( z < 0 || z >= sizeZ ) return false;
+			var chunk = Chunks.GetValueOrDefault( chunk_pos );
 
-			int blockindex = GetBlockIndex( x, y, z );
-			int curBlocktype = GetBlockData( blockindex );
-
-			if ( (blocktype != 0 && curBlocktype == 0) || (blocktype == 0 && curBlocktype != 0) )
+			if ( chunk == null )
 			{
-				blockdata[blockindex] = blocktype;
-
-				return true;
+				chunk = new Chunk( chunk_pos * Chunk.ChunkSize );
+				Chunks[chunk_pos] = chunk;
 			}
 
-			return false;
+			return chunk;
 		}
 
-		public static IntVector3 GetAdjacentPos( int x, int y, int z, int side )
+		private Chunk TryGetChunk( in IntVector3 chunk_pos  )
 		{
-			int adjacentX = x + xOffsets[side];
-			int adjacentY = y + yOffsets[side];
-			int adjacentZ = z + zOffsets[side];
-
-			return new IntVector3( adjacentX, adjacentY, adjacentZ );
+			return Chunks.GetValueOrDefault( chunk_pos );
 		}
 
-		public bool IsAdjacentBlockEmpty( int x, int y, int z, int side )
+		public void RebuildAllChunks()
 		{
-			int adjacentX = x + xOffsets[side];
-			int adjacentY = y + yOffsets[side];
-			int adjacentZ = z + zOffsets[side];
-
-			if ( adjacentX < 0 || adjacentX >= sizeX ||
-				 adjacentY < 0 || adjacentY >= sizeY )
+			foreach (var pair in Chunks)
 			{
-				return true;
+				var pos = pair.Key;
+				var chunk = pair.Value;
+				chunk.PrevChunkX = TryGetChunk( new IntVector3( pos.x-1, pos.y, pos.z ) );
+				chunk.PrevChunkY = TryGetChunk( new IntVector3( pos.x, pos.y-1, pos.z ) );
+				chunk.PrevChunkZ = TryGetChunk( new IntVector3( pos.x, pos.y, pos.z-1 ) );
+
+				chunk.Rebuild();
 			}
-
-			if ( adjacentZ < 0 || adjacentZ >= sizeZ )
-			{
-				return true;
-			}
-
-			if ( adjacentZ >= sizeZ )
-			{
-				return true;
-			}
-
-			var blockIndex = GetBlockIndex( adjacentX, adjacentY, adjacentZ );
-			return blockdata[blockIndex] == 0;
 		}
-
-		public int GetBlockIndex( int x, int y, int z )
-		{
-			return x + y * sizeX + z * sizeX * sizeY;
-		}
-
-		public ushort GetBlockData( int x, int y, int z )
-		{
-			return blockdata[GetBlockIndex( x, y, z )];
-		}
-
-		public ushort GetBlockData( int index )
-		{
-			return blockdata[index];
-		}
-
-		public enum BlockFace : int
-		{
-			Invalid = -1,
-			Top = 0,
-			Bottom = 1,
-			South = 2,
-			East = 3,
-			North = 4,
-			West = 5,
-		};
 
 		//private static readonly int[] FaceAxis = new[] { 1, 1, 2, 2, 0, 0 };
 
+		/*
 		public BlockFace GetBlockInDirection( Vector3 position, Vector3 direction, float length, out IntVector3 hitPosition, out float distance )
 		{
 			hitPosition = new IntVector3( 0, 0, 0 );
@@ -329,6 +264,6 @@ namespace Sandblox
 			distance = length;
 
 			return BlockFace.Invalid;
-		}
+		}*/
 	}
 }

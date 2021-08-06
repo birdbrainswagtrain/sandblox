@@ -1,21 +1,13 @@
-﻿// Some code from https://github.com/Voxtric/Minecraft-Level-Ripper
-
-
-
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 
 using Sandbox;
 
-using Sandblox;
-
-namespace Sandblox.Import
+namespace Cubism.Import
 {
 
     struct Vector

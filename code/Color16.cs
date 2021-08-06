@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using Sandbox;
 
-namespace Sandblox
+namespace Cubism
 {
 	public class Color16
 	{
@@ -31,12 +31,6 @@ namespace Sandblox
 			n = (ushort)(n / 40);
 			float b = (n % 40) / 39f;
 			return new Color( r, g, b );
-		}
-
-		[ServerCmd("test_colors")]
-		public static void TestColors()
-		{
-			Log.Info( "-> " + ToColor( FromInt( 0xa77e4b ) ) );
 		}
 	}
 }

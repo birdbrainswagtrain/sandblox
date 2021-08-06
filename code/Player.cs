@@ -1,6 +1,6 @@
 ﻿using Sandbox;
 
-namespace Sandblox
+namespace Cubism
 {
 	partial class Player : Sandbox.Player
 	{
@@ -23,14 +23,14 @@ namespace Sandblox
 		{
 			base.Simulate( cl );
 
-			if ( IsClient && (Input.Down( InputButton.Duck ) ? Input.Down( InputButton.Attack1 ) : Input.Pressed( InputButton.Attack1 )) )
+			/*if ( IsClient && (Input.Down( InputButton.Duck ) ? Input.Down( InputButton.Attack1 ) : Input.Pressed( InputButton.Attack1 )) )
 			{
 				(Sandbox.Game.Current as Game).SetBlock( EyePos, EyeRot.Forward, (byte)Rand.Int( 1, 5 ) );
 			}
 			else if ( IsClient && (Input.Down( InputButton.Duck ) ? Input.Down( InputButton.Attack2 ) : Input.Pressed( InputButton.Attack2 )) )
 			{
 				(Sandbox.Game.Current as Game).SetBlock( EyePos, EyeRot.Forward, 0 );
-			}
+			}*/
 		}
 	}
 }

@@ -1,6 +1,6 @@
 ﻿using Sandbox.UI;
 
-namespace Sandblox
+namespace Cubism
 {
 	public partial class HudEntity : Sandbox.HudEntity<RootPanel>
 	{
